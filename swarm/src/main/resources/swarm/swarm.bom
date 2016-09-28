@@ -503,6 +503,7 @@ brooklyn.catalog:
           HOST_ADDRESS: $brooklyn:attributeWhenReady("host.address")
           SWARM_DEFAULT_NETWORK: $brooklyn:config("swarm.defaultnetwork")
           CREATE_NETWORK: $brooklyn:config("swarm.defaultnetwork.create")
+          DOCKER_ENDPOINT_PUBLIC: $brooklyn:attributeWhenReady("docker.endpoint.public")
 
         post.launch.command: |
           echo "[CLOCKER] Join Swarm"

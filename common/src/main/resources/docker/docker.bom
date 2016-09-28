@@ -86,12 +86,14 @@ brooklyn.catalog:
         shell.env:
           DOCKER_ADDITIONAL_OPTIONS: $brooklyn:config("docker.additionaloptions")
           HOST_NAME: $brooklyn:attributeWhenReady("host.name")
+          HOST_ADDRESS: $brooklyn:attributeWhenReady("host.address")
           DOCKER_IMAGE_PREINSTALL: $brooklyn:config("image.preinstall")
           DOCKER_PACKAGE: $brooklyn:config("docker.package")
           DOCKER_VERSION: $brooklyn:config("docker.version")
           DOCKER_REPOSITORY_URL: $brooklyn:config("docker.repository.url")
           DOCKER_GPG_KEY_URL: $brooklyn:config("docker.gpgkey.url")
-          ENTITY_ID: $brooklyn:entityId()
+          ENTITY_ID: $brooklyn:attributeWhenReady("entity.id")
+          APPLICATION_ID: $brooklyn:attributeWhenReady("application.id")
           CLOCKER_VERSION: "2.0.0-SNAPSHOT"
 
         install.command: |
@@ -138,9 +140,11 @@ brooklyn.catalog:
           sudo tee /etc/systemd/system/docker.service.d/daemon.json <<-EOF
           {
             "labels": [
-              "io.cloudsoft.clocker.name=${HOST_NAME}",
-              "io.cloudsoft.clocker.version=${CLOCKER_VERSION}",
-              "io.cloudsoft.clocker.entityId=${ENTITY_ID}"
+              "org.label-schema.schema-version=1.0",
+              "org.label-schema.version=${CLOCKER_VERSION}",
+              "org.label-schema.name=${HOST_ADDRESS}",
+              "io.brooklyn.clocker.entity=${ENTITY_ID}",
+              "io.brooklyn.clocker.application=${APPLICATION_ID}"
             ]
           }
           EOF
@@ -229,6 +233,7 @@ brooklyn.catalog:
         - type: org.apache.brooklyn.enricher.stock.Transformer
           brooklyn.config:
             uniqueTag: docker-public-endpoint-generator
+            enricher.suppressDuplicates: false
             enricher.triggerSensors:
               - $brooklyn:sensor("host.address")
               - $brooklyn:sensor("docker.port")
@@ -241,6 +246,7 @@ brooklyn.catalog:
         - type: org.apache.brooklyn.enricher.stock.Transformer
           brooklyn.config:
             uniqueTag: docker-endpoint-generator
+            enricher.suppressDuplicates: false
             enricher.triggerSensors:
               - $brooklyn:sensor("host.subnet.address")
               - $brooklyn:sensor("docker.port")
@@ -253,6 +259,7 @@ brooklyn.catalog:
         - type: org.apache.brooklyn.enricher.stock.Transformer
           brooklyn.config:
             uniqueTag: docker-url-generator
+            enricher.suppressDuplicates: false
             enricher.triggerSensors:
               - $brooklyn:sensor("docker.endpoint")
             enricher.targetSensor: $brooklyn:sensor("docker.url")
@@ -263,6 +270,7 @@ brooklyn.catalog:
         - type: org.apache.brooklyn.enricher.stock.Transformer
           brooklyn.config:
             uniqueTag: docker-bind-url-generator
+            enricher.suppressDuplicates: false
             enricher.triggerSensors:
               - $brooklyn:sensor("docker.port")
             enricher.targetSensor: $brooklyn:sensor("docker.bind.url")
@@ -302,7 +310,6 @@ brooklyn.catalog:
           INSTALL_DIR: $brooklyn:attributeWhenReady("install.dir")
           TLS_OPTIONS: $brooklyn:config("docker.tlsoptions")
           DOCKER_ENDPOINT: $brooklyn:attributeWhenReady("docker.endpoint")
-          DOCKER_ENDPOINT_PUBLIC: $brooklyn:attributeWhenReady("docker.endpoint.public")
           DOCKER_HOST: $brooklyn:attributeWhenReady("docker.url")
           DOCKER_TLS_VERIFY: true
           DOCKER_CERT_PATH: $brooklyn:config("docker.cert.path")
