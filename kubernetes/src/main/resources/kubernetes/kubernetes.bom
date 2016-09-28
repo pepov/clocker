@@ -313,6 +313,10 @@ brooklyn.catalog:
             between workers and to allow external access to deployed apps
           type: boolean
           default: true
+        - name: kubernetes.cadvisor.port
+          label: "Kubernetes cAdvisor Port"
+          type: integer
+          default: 4194
 
       brooklyn.config:
         childStartMode: foreground_late
@@ -362,25 +366,23 @@ brooklyn.catalog:
           clusters:
             - name: ${CLUSTER_NAME}
               cluster:
-                api-version: v1
                 server: ${KUBERNETES_URL}
+          users:
+            - name: ${KUBERNETES_USER}
+              user:
+                username: ${KUBERNETES_USER}
+                password: ${KUBERNETES_PASSWORD}
           contexts:
             - name: default
               context:
                 cluster: ${CLUSTER_NAME}
+                user: ${KUBERNETES_USER}
                 namespace: default
-                user: default
-          users:
-            - name: default
-              user:
-                username: ${KUBERNETES_USER}
-                password: ${KUBERNETES_PASSWORD}
-          current-context: default
           EOF
           kubectl config set-cluster ${CLUSTER_NAME} --server=${KUBERNETES_URL}
-          kubectl config set-context default --cluster=${CLUSTER_NAME}
+          kubectl config set-credentials ${KUBERNETES_USER} --username=${KUBERNETES_USER} --password=${KUBERNETES_PASSWORD}
+          kubectl config set-context default --cluster=${CLUSTER_NAME} --user=${KUBERNETES_USER} --namespace=default
           kubectl config use-context default
-          kubectl config set-credentials default --username=${KUBERNETES_USER} --password=${KUBERNETES_PASSWORD}
 
         checkRunning.command: |
           which kubectl
@@ -455,6 +457,17 @@ brooklyn.catalog:
               - $brooklyn:sensor("org.apache.brooklyn.entity.machine.MachineAttributes", "machine.memory.total")
               - $brooklyn:sensor("org.apache.brooklyn.entity.machine.MachineAttributes", "memory.used.delta")
               - $brooklyn:sensor("org.apache.brooklyn.entity.machine.MachineAttributes", "memory.used.percent")
+        - type: org.apache.brooklyn.enricher.stock.Transformer
+          brooklyn.config:
+            uniqueTag: kubernetes-cadvisor-url-publisher
+            enricher.triggerSensors:
+              - $brooklyn:sensor("host.address")
+            enricher.targetSensor: $brooklyn:sensor("kubernetes.cadvisor.url")
+            enricher.targetValue:
+              $brooklyn:formatString:
+                - "http://%s:%d/containers/"
+                - $brooklyn:attributeWhenReady("host.address")
+                - $brooklyn:config("kubernetes.cadvisor.port")
 
       brooklyn.initializers:
         - type: org.apache.brooklyn.core.sensor.ssh.SshCommandSensor
@@ -668,6 +681,7 @@ brooklyn.catalog:
           KUBERNETES_URL: $brooklyn:entity("kubernetes-master").attributeWhenReady("kubernetes.url")
           DNS_SERVICE_IP: $brooklyn:entity("kubernetes-cluster").config("kubernetes.dns.address")
           DNS_LOCAL_DOMAIN: $brooklyn:entity("kubernetes-cluster").config("kubernetes.dns.domain")
+          CADVISOR_PORT: $brooklyn:parent().config("kubernetes.cadvisor.port")
           SCHEDULABLE: $brooklyn:config("kubernetes.schedulable")
           CLOCKER_VERSION: "2.0.0-SNAPSHOT"
 
@@ -712,6 +726,7 @@ brooklyn.catalog:
             --address=0.0.0.0 \
             --allow-privileged=true \
             --config=/etc/kubernetes/manifests \
+            --cadvisor-port=${CADVISOR_PORT} \
             --node-ip=${HOST_ADDRESS} \
             --hostname-override=${HOST_SUBNET_ADDRESS} \
             --api-servers=${KUBERNETES_URL} \
@@ -750,14 +765,8 @@ brooklyn.catalog:
         - name: kubernetes.admission.control
           label: "Kubernetes Admission Control"
           type: string
-          default: >-
-            NamespaceLifecycle,
-            NamespaceExists,
-            LimitRanger,
-            SecurityContextAllow,
-            ResourceQuota,
-            AlwaysAdmit,
-            ServiceAccount
+          default:
+            NamespaceLifecycle,NamespaceExists,LimitRanger,ResourceQuota,AlwaysAdmit,ServiceAccount
 
       brooklyn.config:
         kubernetes.service: "kube-apiserver"
@@ -1029,7 +1038,7 @@ brooklyn.catalog:
       brooklyn.config:
         kubernetes.pod.name: "policy-controller"
         kubernetes.pod.file: "classpath://io.brooklyn.clocker.kubernetes:kubernetes/policy-controller.yaml"
-        kubernetes.pod.namespace: "calico-system"
+        kubernetes.pod.namespace: "kube-system"
         kubernetes.pod.manifest: true
 
         template.substitutions:
