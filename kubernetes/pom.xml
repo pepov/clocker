@@ -11,7 +11,7 @@
     </parent>
 
     <name>Clocker :: Kubernetes</name>
-    <artifactId>kubernetes</artifactId>
+    <artifactId>clocker-kubernetes</artifactId>
     <packaging>jar</packaging>
 
     <build>
@@ -21,11 +21,17 @@
                 <filtering>false</filtering>
             </resource>
             <resource>
+                <directory>src/main/examples</directory>
+                <filtering>false</filtering>
+            </resource>
+        </resources>
+        <testResources>
+            <testResource>
                 <directory>src/test/resources</directory>
                 <filtering>false</filtering>
                 <targetPath>tests</targetPath>
-            </resource>
-        </resources>
+            </testResource>
+        </testResources>
 
         <plugins>
             <plugin>
@@ -42,14 +48,19 @@
                         <configuration>
                             <artifacts>
                                 <artifact>
+                                    <file>${project.basedir}/src/main/resources/kubernetes/catalog.bom</file>
+                                    <type>bom</type>
+                                    <classifier>catalog</classifier>
+                                </artifact>
+                                <artifact>
                                     <file>${project.basedir}/src/main/resources/kubernetes/kubernetes.bom</file>
                                     <type>bom</type>
-                                    <classifier>kubernetes-catalog</classifier>
+                                    <classifier>kubernetes</classifier>
                                 </artifact>
                                 <artifact>
                                     <file>${project.basedir}/src/main/resources/kubernetes/plugins.bom</file>
                                     <type>bom</type>
-                                    <classifier>plugins-catalog</classifier>
+                                    <classifier>plugins</classifier>
                                 </artifact>
                             </artifacts>
                         </configuration>

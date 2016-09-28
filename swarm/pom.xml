@@ -11,7 +11,7 @@
     </parent>
 
     <name>Clocker :: Swarm</name>
-    <artifactId>swarm</artifactId>
+    <artifactId>clocker-swarm</artifactId>
     <packaging>jar</packaging>
 
     <build>
@@ -21,11 +21,17 @@
                 <filtering>false</filtering>
             </resource>
             <resource>
+                <directory>src/main/examples</directory>
+                <filtering>false</filtering>
+            </resource>
+        </resources>
+        <testResources>
+            <testResource>
                 <directory>src/test/resources</directory>
                 <filtering>false</filtering>
                 <targetPath>tests</targetPath>
-            </resource>
-        </resources>
+            </testResource>
+        </testResources>
 
         <plugins>
             <plugin>
@@ -42,9 +48,14 @@
                         <configuration>
                             <artifacts>
                                 <artifact>
+                                    <file>${project.basedir}/src/main/resources/swarm/catalog.bom</file>
+                                    <type>bom</type>
+                                    <classifier>catalog</classifier>
+                                </artifact>
+                                <artifact>
                                     <file>${project.basedir}/src/main/resources/swarm/swarm.bom</file>
                                     <type>bom</type>
-                                    <classifier>swarm-catalog</classifier>
+                                    <classifier>swarm</classifier>
                                 </artifact>
                             </artifacts>
                         </configuration>

@@ -46,6 +46,17 @@
         </license>
     </licenses>
 
+    <developers>
+        <developer>
+            <id>grkvlt</id>
+            <name>Andrew Kennedy</name>
+            <email>andrew@cloudsoft.io</email>
+            <roles>
+                <role>founder</role>
+            </roles>
+        </developer>
+    </developers>
+
     <distributionManagement>
         <snapshotRepository>
             <id>sonatype-nexus-snapshots</id>
