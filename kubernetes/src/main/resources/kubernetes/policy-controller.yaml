@@ -4,6 +4,8 @@ metadata:
   name: policy-controller
   namespace: kube-system
   labels:
+    app: policy-controller
+    name: policy-controller-pod
     version: "v0.3.0"
     projectcalico.org/app: "policy-controller"
 spec:

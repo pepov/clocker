@@ -23,6 +23,7 @@ services:
     name: "kubernetes"
     brooklyn.config:
       kubernetes.debug: true
+      kubernetes.version: 1.4.0
       start.timeout: 30m
       kubernetes.initial.size: 4
       kubernetes.max.size: 16

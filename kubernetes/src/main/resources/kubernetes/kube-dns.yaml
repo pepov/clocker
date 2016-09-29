@@ -4,12 +4,13 @@ metadata:
   name: kube-dns
   namespace: kube-system
   labels:
-    k8s-app: kube-dns
+    app: kube-dns
+    name: kube-dns-service
     kubernetes.io/cluster-service: "true"
     kubernetes.io/name: "KubeDNS"
 spec:
   selector:
-    k8s-app: kube-dns
+    app: kube-dns
   clusterIP: ${config['template.substitutions']['dns_service_ip']}
   ports:
     - name: dns
@@ -22,21 +23,22 @@ spec:
 apiVersion: v1
 kind: ReplicationController
 metadata:
-  name: kube-dns-v19
+  name: kube-dns
   namespace: kube-system
   labels:
-    k8s-app: kube-dns
+    app: kube-dns
+    name: kube-dns-replicationcontroller
     version: v19
     kubernetes.io/cluster-service: "true"
 spec:
   replicas: 1
   selector:
-    k8s-app: kube-dns
+    app: kube-dns
     version: v19
   template:
     metadata:
       labels:
-        k8s-app: kube-dns
+        app: kube-dns
         version: v19
         kubernetes.io/cluster-service: "true"
       annotations:

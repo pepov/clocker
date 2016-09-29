@@ -1,11 +1,12 @@
 kind: Deployment
 apiVersion: extensions/v1beta1
 metadata:
-  labels:
-    app: kubernetes-dashboard
-    version: v1.4.0
   name: kubernetes-dashboard
   namespace: kube-system
+  labels:
+    app: kubernetes-dashboard
+    name: kubernetes-dashboard-deployment
+    version: v1.4.0
 spec:
   replicas: 1
   selector:
@@ -35,10 +36,11 @@ spec:
 kind: Service
 apiVersion: v1
 metadata:
-  labels:
-    app: kubernetes-dashboard
   name: kubernetes-dashboard
   namespace: kube-system
+  labels:
+    app: kubernetes-dashboard
+    name: kubernetes-dashboard-service
 spec:
   type: NodePort
   ports:

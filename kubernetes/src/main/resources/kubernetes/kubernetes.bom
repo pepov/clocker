@@ -46,7 +46,7 @@ brooklyn.catalog:
         - name: kubernetes.version
           label: "Kubernetes Version"
           type: string
-          default: "1.3.8"
+          default: "1.4.0"
         - name: kubernetes.cluster.name
           label: "Kubernetes Cluster Name"
           type: string
@@ -183,7 +183,7 @@ brooklyn.catalog:
         - name: kubernetes.version
           label: "Kubernetes Version"
           type: string
-          default: "1.3.8"
+          default: "1.4.0"
         - name: kubernetes.user
           label: "Kubernetes User"
           type: string
@@ -491,8 +491,8 @@ brooklyn.catalog:
             shell.env:
               HOST_SUBNET_ADDRESS: $brooklyn:attributeWhenReady("host.subnet.address")
             command: |
-              kubectl get node ${HOST_SUBNET_ADDRESS} \
-                -o jsonpath={range @.status.conditions[*]}{@.type}={@.status}
+              kubectl get node ${HOST_SUBNET_ADDRESS} -o jsonpath='{range @.status.conditions[*]}{@.type}={@.status}
+              ' | grep True | cut -d= -f1
         - type: org.apache.brooklyn.core.effector.ssh.SshCommandEffector
           brooklyn.config:
             name: kubectl
@@ -778,7 +778,7 @@ brooklyn.catalog:
           label: "Kubernetes Admission Control"
           type: string
           default:
-            NamespaceLifecycle,NamespaceExists,LimitRanger,ResourceQuota,AlwaysAdmit,ServiceAccount
+            NamespaceLifecycle,NamespaceExists,LimitRanger,ResourceQuota,AlwaysAdmit
 
       brooklyn.config:
         kubernetes.service: "kube-apiserver"
@@ -880,7 +880,7 @@ brooklyn.catalog:
   - id: kubernetes-pod
     name: "Kubernetes Pod"
     description: |
-      A Kubernetes pod deployment
+      A Kubernetes YAML pod deployment
     itemType: entity
     iconUrl: https://pbs.twimg.com/media/Bt_pEfqCAAAiVyz.png
     item:
@@ -919,10 +919,10 @@ brooklyn.catalog:
           $brooklyn:config("kubernetes.pod.file"): "pod.yaml"
 
         shell.env:
-          POD: $brooklyn:config("kubernetes.pod.name")
+          NAME: $brooklyn:config("kubernetes.pod.name")
           NAMESPACE: $brooklyn:config("kubernetes.pod.namespace")
-          INSTALL_DIR: $brooklyn:attributeWhenReady("install.dir")
           MANIFEST: $brooklyn:config("kubernetes.pod.manifest")
+          INSTALL_DIR: $brooklyn:attributeWhenReady("install.dir")
 
         pre.install.command: |
           mkdir -p ${INSTALL_DIR}
@@ -933,23 +933,22 @@ brooklyn.catalog:
 
         launch.command: |
           if ${MANIFEST} ; then
-            sudo cp ${INSTALL_DIR}/pod.yaml /etc/kubernetes/manifests/${POD}.yaml
+            sudo cp ${INSTALL_DIR}/pod.yaml /etc/kubernetes/manifests/${NAME}.yaml
           else
             kubectl create -f ${INSTALL_DIR}/pod.yaml
           fi
 
         stop.command: |
           if ${MANIFEST} ; then
-            sudo rm /etc/kubernetes/manifests/${POD}.yaml
-            kubectl delete pod -l app=${POD} --namespace=${NAMESPACE}
+            sudo rm /etc/kubernetes/manifests/${NAME}.yaml
+            kubectl delete pod -l app=${NAME} --namespace=${NAMESPACE}
           else
             kubectl delete -f ${INSTALL_DIR}/pod.yaml
           fi
 
         checkRunning.command: |
-          kubectl get pod --namespace=${NAMESPACE} |
-            grep ${POD} |
-            grep "Pending\|Running"
+          kubectl get pod --namespace=${NAMESPACE} -l app=${NAME} |
+              grep "Pending\|ContainerCreating\|Running"
 
       brooklyn.initializers:
         - type: org.apache.brooklyn.core.sensor.ssh.SshCommandSensor
@@ -959,7 +958,7 @@ brooklyn.catalog:
               Kubernetes pod name
             targetType: string
             command: |
-              kubectl get pod --namespace=${NAMESPACE} -l app=${POD} --output=jsonpath='{range .items[0]}{.metadata.name}'
+              kubectl get pod --namespace=${NAMESPACE} -l app=${NAME} --output=jsonpath='{range .items[0]}{.metadata.name}'
         - type: org.apache.brooklyn.core.sensor.ssh.SshCommandSensor
           brooklyn.config:
             name: kubernetes.pod.status
@@ -967,15 +966,15 @@ brooklyn.catalog:
               Kubernetes pod status
             targetType: string
             command: |
-              kubectl get pod --namespace=${NAMESPACE} -l app=${POD} --output=jsonpath='{range .items[0]}{.status.phase}'
+              kubectl get pod --namespace=${NAMESPACE} -l app=${NAME} -o wide | grep ${NAME}
         - type: org.apache.brooklyn.core.sensor.ssh.SshCommandSensor
           brooklyn.config:
             name: kubernetes.pod.node
             description: |
-              Kubernetes host IP address for the pod node
+              Kubernetes host IP address for the service
             targetType: string
             command: |
-              kubectl get pod --namespace=${NAMESPACE} -l app=${POD} --output=jsonpath='{range .items[0]}{.status.hostIP}'
+              kubectl get pod --namespace=${NAMESPACE} -l app=${NAME} --output=jsonpath='{range .items[0]}{.status.hostIP}'
         - type: org.apache.brooklyn.core.sensor.ssh.SshCommandSensor
           brooklyn.config:
             name: kubernetes.service.port
@@ -983,15 +982,23 @@ brooklyn.catalog:
               Kubernetes exposed NodePort for a service
             targetType: integer
             command: |
-              kubectl get service ${POD} --namespace=${NAMESPACE} --output=jsonpath='{range .spec.ports[0]}{.nodePort}'
+              kubectl get service ${NAME} --namespace=${NAMESPACE} --output=jsonpath='{range .spec.ports[0]}{.nodePort}'
+        - type: org.apache.brooklyn.core.sensor.ssh.SshCommandSensor
+          brooklyn.config:
+            name: kubernetes.pod.phase
+            description: |
+              Kubernetes pod status phase
+            targetType: string
+            command: |
+              kubectl get pod --namespace=${NAMESPACE} -l app=${NAME} --output=jsonpath='{range .items[0]}{.status.phase}'
 
       brooklyn.enrichers:
         - type: org.apache.brooklyn.enricher.stock.Transformer
           brooklyn.config:
             uniqueTag: kubernetes-pod-url-publisher
             enricher.triggerSensors:
-              - $brooklyn:sensor("kubernetes.service.port")
               - $brooklyn:sensor("kubernetes.pod.node")
+              - $brooklyn:sensor("kubernetes.service.port")
             enricher.targetSensor: $brooklyn:sensor("kubernetes.service.url")
             enricher.targetValue:
               $brooklyn:formatString:
@@ -1008,7 +1015,7 @@ brooklyn.catalog:
   - id: kube-dns-pod
     name: "KubeDNS Pod"
     description: |
-      KubeDNS pod deployment
+      KubeDNS service pod
     itemType: entity
     item:
       type: kubernetes-pod
@@ -1026,7 +1033,7 @@ brooklyn.catalog:
   - id: kubernetes-dashboard-pod
     name: "Kubernetes Dashboard Pod"
     description: |
-      Kubernetes dashboard pod deployment
+      Kubernetes dashboard UI service pod
     itemType: entity
     item:
       type: kubernetes-pod
@@ -1042,7 +1049,7 @@ brooklyn.catalog:
   - id: calico-policy-controller-pod
     name: "Calico Policy Controller Pod"
     description: |
-      Calico policy controller pod deployment
+      Calico policy controller pod
     itemType: entity
     item:
       type: kubernetes-pod
@@ -1060,7 +1067,7 @@ brooklyn.catalog:
   - id: prometheus-pod
     name: "Prometheus Monitoring Pod"
     description: |
-      Prometheus monitoring service pod deployment
+      Prometheus monitoring service pod
     itemType: entity
     iconUrl: https://avatars1.githubusercontent.com/u/3380462
     item:
