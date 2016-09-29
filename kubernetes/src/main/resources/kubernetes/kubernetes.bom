@@ -317,6 +317,10 @@ brooklyn.catalog:
           label: "Kubernetes cAdvisor Port"
           type: integer
           default: 4194
+        - name: kubernetes.debug
+          label: "Kubernetes Debug"
+          type: boolean
+          default: false
 
       brooklyn.config:
         childStartMode: foreground_late
@@ -342,6 +346,7 @@ brooklyn.catalog:
           HOST_ADDRESS: $brooklyn:attributeWhenReady("host.address")
           HOST_SUBNET_ADDRESS: $brooklyn:attributeWhenReady("host.subnet.address")
           ENTITY_ID: $brooklyn:attributeWhenReady("entity.id")
+          KUBERNETES_DEBUG: $brooklyn:config("kubernetes.debug")
 
         kubectl.download.url:
           $brooklyn:formatString:
@@ -351,6 +356,13 @@ brooklyn.catalog:
         pre.install.command: |
           sudo hostname ${ENTITY_ID}
           echo ${ENTITY_ID} | sudo tee /etc/hostname
+
+          sudo yum update -y
+
+          if  ${KUBERNETES_DEBUG:-false} ; then
+            echo "[CLOCKER] Installing debugging tools"
+            sudo yum install -y net-tools traceroute telnet bash-completion
+          fi
 
         install.command: |
           sudo yum install -y wget

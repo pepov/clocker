@@ -25,7 +25,7 @@ spec:
       imagePullPolicy: IfNotPresent
       args:
         - "--election=calico-policy-election"
-        - "--election-namespace=calico-system"
+        - "--election-namespace=kube-system"
         - "--http=127.0.0.1:4040"
       volumeMounts:
         - mountPath: "/kubeconfig"
