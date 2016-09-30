@@ -24,14 +24,12 @@
                 <directory>src/main/examples</directory>
                 <filtering>false</filtering>
             </resource>
-        </resources>
-        <testResources>
-            <testResource>
+            <resource>
                 <directory>src/test/resources</directory>
                 <filtering>false</filtering>
                 <targetPath>tests</targetPath>
-            </testResource>
-        </testResources>
+            </resource>
+        </resources>
 
         <plugins>
             <plugin>
