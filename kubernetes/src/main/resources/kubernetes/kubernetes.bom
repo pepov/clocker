@@ -155,6 +155,55 @@ brooklyn.catalog:
                         factoryMethod.args:
                           - "kubernetes-worker"
 
+  - id: kubernetes-worker-pool
+    name: "Kubernetes Worker Cluster"
+    description: |
+      Creates a Kubernetes worker cluster
+    itemType: entity
+    item:
+        type: cluster
+        brooklyn.policies:
+          - type: org.apache.brooklyn.policy.ha.ServiceReplacer
+            brooklyn.config:
+              failureSensorToMonitor: $brooklyn:sensor("ha.entityFailed")
+              failOnRecurringFailuresInThisDuration:
+                $brooklyn:config("kubernetes.recovery.failOnRecurringFailuresInThisDuration")
+          - type: org.apache.brooklyn.policy.autoscaling.AutoScalerPolicy
+            brooklyn.config:
+              autoscaler.metric:
+                $brooklyn:sensor("org.apache.brooklyn.entity.machine.MachineAttributes", "cpu.average")
+              autoscaler.metricLowerBound: 0.00
+              autoscaler.metricUpperBound:
+                $brooklyn:entity("kubernetes-cluster").config("kubernetes.scaling.cpu.limit")
+              autoscaler.minPoolSize:
+                $brooklyn:entity("kubernetes-cluster").config("kubernetes.initial.size")
+              autoscaler.maxPoolSize:
+                $brooklyn:entity("kubernetes-cluster").config("kubernetes.max.size")
+              autoscaler.resizeUpStabilizationDelay: 30s
+              autoscaler.resizeDownIterationMax: 0 # Disable scaling down
+              autoscaler.resizeDownStabilizationDelay: forever
+        brooklyn.enrichers:
+          - type: org.apache.brooklyn.enricher.stock.Aggregator
+            brooklyn.config:
+              uniqueTag: kubernetes-cluster-cpu-averageing
+              enricher.sourceSensor:
+                $brooklyn:sensor("org.apache.brooklyn.entity.machine.MachineAttributes", "machine.cpu")
+              enricher.targetSensor:
+                $brooklyn:sensor("org.apache.brooklyn.entity.machine.MachineAttributes", "cpu.average")
+              enricher.aggregating.fromMembers: true
+              transformation: average
+        brooklyn.config:
+          cluster.initial.size: $brooklyn:entity("kubernetes-cluster").config("kubernetes.initial.size")
+          dynamiccluster.quarantineFailedEntities:
+            $brooklyn:parent().config("kubernetes.recovery.quarantineFailedEntities")
+          dynamiccluster.memberspec:
+            $brooklyn:entitySpec:
+              type: kubernetes-worker
+              id: kubernetes-worker
+              name: "kubernetes-worker"
+              brooklyn.config:
+                launch.latch: $brooklyn:entity("kubernetes-master-cluster").attributeWhenReady("service.isUp")
+
   - id: kubernetes-cluster
     name: "Kubernetes Cluster"
     description: |
@@ -397,50 +446,17 @@ brooklyn.catalog:
                   launch.latch: $brooklyn:entity("etcd-cluster").attributeWhenReady("service.isUp")
                   kubernetes.schedulable: false
 
-        - type: cluster
-          id: kubernetes-worker-cluster
-          name: "kubernetes-worker-cluster"
-          brooklyn.policies:
-            - type: org.apache.brooklyn.policy.ha.ServiceReplacer
-              brooklyn.config:
-                failureSensorToMonitor: $brooklyn:sensor("ha.entityFailed")
-                failOnRecurringFailuresInThisDuration:
-                  $brooklyn:config("kubernetes.recovery.failOnRecurringFailuresInThisDuration")
-            - type: org.apache.brooklyn.policy.autoscaling.AutoScalerPolicy
-              brooklyn.config:
-                autoscaler.metric:
-                  $brooklyn:sensor("org.apache.brooklyn.entity.machine.MachineAttributes", "cpu.average")
-                autoscaler.metricLowerBound: 0.00
-                autoscaler.metricUpperBound:
-                  $brooklyn:entity("kubernetes-cluster").config("kubernetes.scaling.cpu.limit")
-                autoscaler.minPoolSize:
-                  $brooklyn:entity("kubernetes-cluster").config("kubernetes.initial.size")
-                autoscaler.maxPoolSize:
-                  $brooklyn:entity("kubernetes-cluster").config("kubernetes.max.size")
-                autoscaler.resizeUpStabilizationDelay: 30s
-                autoscaler.resizeDownIterationMax: 0 # Disable scaling down
-                autoscaler.resizeDownStabilizationDelay: forever
-          brooklyn.enrichers:
-            - type: org.apache.brooklyn.enricher.stock.Aggregator
-              brooklyn.config:
-                uniqueTag: kubernetes-cluster-cpu-averageing
-                enricher.sourceSensor:
-                  $brooklyn:sensor("org.apache.brooklyn.entity.machine.MachineAttributes", "machine.cpu")
-                enricher.targetSensor:
-                  $brooklyn:sensor("org.apache.brooklyn.entity.machine.MachineAttributes", "cpu.average")
-                enricher.aggregating.fromMembers: true
-                transformation: average
+        - type: kubernetes-worker-pool
+          id: kubernetes-worker-pool-permanent
+          name: kubernetes-worker-pool-permanent
           brooklyn.config:
-            cluster.initial.size: $brooklyn:entity("kubernetes-cluster").config("kubernetes.initial.size")
-            dynamiccluster.quarantineFailedEntities:
-              $brooklyn:parent().config("kubernetes.recovery.quarantineFailedEntities")
-            dynamiccluster.memberspec:
-              $brooklyn:entitySpec:
-                type: kubernetes-worker
-                id: kubernetes-worker
-                name: "kubernetes-worker"
-                brooklyn.config:
-                  launch.latch: $brooklyn:entity("kubernetes-master-cluster").attributeWhenReady("service.isUp")
+            kubernetes.node.labels: "nodetype=petset"
+
+        - type: kubernetes-worker-pool
+          id: kubernetes-worker-pool-scaled
+          name: kubernetes-worker-pool-scaled
+          brooklyn.config:
+            kubernetes.node.labels: "nodetype=disposable"
 
   - id: kubernetes-worker
     name: "Kubernetes Worker"
@@ -805,6 +821,10 @@ brooklyn.catalog:
           label: "Kubernetes Schedulable"
           type: boolean
           default: true
+        - name: kubernetes.node.labels
+          description: |
+            Label to assign to the node
+          default: 'io.brooklyn.clocker.placeholder=default'
 
       brooklyn.config:
         kubernetes.service: "kubelet"
@@ -817,6 +837,7 @@ brooklyn.catalog:
           CADVISOR_PORT: $brooklyn:parent().config("kubernetes.cadvisor.port")
           SCHEDULABLE: $brooklyn:config("kubernetes.schedulable")
           CLOCKER_VERSION: "2.1.0-SNAPSHOT"
+          CUSTOM_LABELS: $brooklyn:config("kubernetes.node.labels")
 
         customize.command: |
           sudo -E tee /etc/cni/net.d/10-calico.conf <<-EOF
@@ -844,7 +865,9 @@ brooklyn.catalog:
           org.label-schema.version=${CLOCKER_VERSION},\
           org.label-schema.name=${HOST_ADDRESS},\
           io.brooklyn.clocker.entity=${ENTITY_ID},\
-          io.brooklyn.clocker.application=${APPLICATION_ID}"
+          io.brooklyn.clocker.application=${APPLICATION_ID},\
+          ${CUSTOM_LABELS}"
+
           sudo mkdir -p /etc/kubernetes/manifests
           sudo -E tee /etc/systemd/system/kubelet.service <<-EOF
           [Unit]
