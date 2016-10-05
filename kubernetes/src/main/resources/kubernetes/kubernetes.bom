@@ -485,16 +485,6 @@ brooklyn.catalog:
       brooklyn.config:
         childStartMode: foreground_late
 
-        provisioning.properties:
-          # TODO change merge status for customizers config key
-          customizer:
-            $brooklyn:object:
-              type: org.apache.brooklyn.location.jclouds.networking.SharedLocationSecurityGroupCustomizer
-              object.fields:
-                tcpPortRanges:
-                  - "30000-32767"
-                enabled: $brooklyn:config("kubernetes.sharedsecuritygroup.create")
-
         shell.env:
           KUBERNETES_VERSION: $brooklyn:entity("kubernetes-cluster").config("kubernetes.version")
           CLUSTER_NAME: $brooklyn:entity("kubernetes-cluster").config("kubernetes.cluster.name")
