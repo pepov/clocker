@@ -162,6 +162,12 @@ brooklyn.catalog:
     itemType: entity
     item:
         type: cluster
+        brooklyn.parameters:
+        - name: kubernetes.scaling.down.cpu.limit
+          label: Trigger level to scale down
+          description: |
+            Minimum average cpu load before scaling down
+          default: 0.00 # don't scale
         brooklyn.policies:
           - type: org.apache.brooklyn.policy.ha.ServiceReplacer
             brooklyn.config:
@@ -172,7 +178,8 @@ brooklyn.catalog:
             brooklyn.config:
               autoscaler.metric:
                 $brooklyn:sensor("org.apache.brooklyn.entity.machine.MachineAttributes", "cpu.average")
-              autoscaler.metricLowerBound: 0.00
+              autoscaler.metricLowerBound: 
+                $brooklyn:config("kubernetes.scaling.down.cpu.limit")
               autoscaler.metricUpperBound:
                 $brooklyn:entity("kubernetes-cluster").config("kubernetes.scaling.cpu.limit")
               autoscaler.minPoolSize:
@@ -180,8 +187,8 @@ brooklyn.catalog:
               autoscaler.maxPoolSize:
                 $brooklyn:entity("kubernetes-cluster").config("kubernetes.max.size")
               autoscaler.resizeUpStabilizationDelay: 30s
-              autoscaler.resizeDownIterationMax: 0 # Disable scaling down
-              autoscaler.resizeDownStabilizationDelay: forever
+              #autoscaler.resizeDownIterationMax: 0 # Disable scaling down
+              autoscaler.resizeDownStabilizationDelay: 30s
         brooklyn.enrichers:
           - type: org.apache.brooklyn.enricher.stock.Aggregator
             brooklyn.config:
@@ -457,6 +464,7 @@ brooklyn.catalog:
           name: kubernetes-worker-pool-scaled
           brooklyn.config:
             kubernetes.node.labels: "nodetype=disposable"
+            kubernetes.scaling.down.cpu.limit: 0.5
 
   - id: kubernetes-worker
     name: "Kubernetes Worker"
